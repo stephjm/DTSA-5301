@@ -1,0 +1,177 @@
+---
+title: "NYPD Shooting Incident Data Report"
+author: "DTSA 5301 Student"
+date: "14/05/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The NYPD Shooting Incident Data (Historic) csv file is used in this data report. It is obtained from the data catalog of the U.S Government's open data initiative (data.gov).
+
+```{r get_data, echo=TRUE}
+#Start by using the Tidyverse library
+library(tidyverse)
+#Obtain NYPD Shooting Incident CSV file from data.gov
+url_link <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+```
+
+The csv file that we will import contains a list of all shooting incidents that took place in NYC from 2006 to November 10, 2020. The event, location, and time of each shooting incident are also included along with demographic information pertaining to the suspects and victims.
+
+```{r import_data, echo=TRUE, message=FALSE}
+#Read in CSV file
+nypd_data <-read_csv(url_link)
+```
+
+We will first inspect and view the csv file.
+
+```{r view_data, echo=TRUE}
+#View the dataset
+nypd_data
+```
+
+Then, we will obtain the summary statistics of the data.
+``` {r summary_data, echo=TRUE}
+summary(nypd_data)
+```
+
+There are 19 variables in this data set. We would like to explore the relationships between the variables. More specifically, we will determine the frequency of the shooting incidents by location, analyze the demographics of both parties, and investigate whether the victim's death is dependent on the borough. To answer these questions, we would like to include all columns except INCIDENT_KEY, X_COORD_CD, Y_COORD_CD, Latitude, Longitude, and Lon_Lat. Since the OCCUR_DATE column has characters, we will transform those dates into a date type variable using the lubridate library. 
+
+```{r subset_data, echo=TRUE}
+#Use lubridate library
+library(lubridate)
+
+#Clean up data by removing some columns and transform OCCUR_DATE column to contain date type values
+nypd <- nypd_data %>% 
+  select(OCCUR_DATE:VIC_RACE) %>% 
+  mutate(OCCUR_DATE=mdy(OCCUR_DATE))
+
+nypd
+```
+
+The summary statistics of the transformed dataset is examined.
+
+```{r transformed_summary, echo=TRUE}
+summary(nypd)
+```
+
+We will now identify the class for all the column variables in the transformed dataset.
+
+```{r string_id, echo=TRUE}
+str(nypd)
+```
+
+Eight out of thirteen variables have characters as the class of the variables. We will convert those column variables with character class into factors.
+
+```{r factor_data, echo=TRUE}
+nypd_c <- as.data.frame(unclass(nypd))
+nypd_c[sapply(nypd_c, is.character)] <- lapply(nypd_c[sapply(nypd_c, is.character)],as.factor)
+```
+
+We verify that all column variables previously with the character class are now converted into the factor class.
+
+```{r verify_string_new, echo=TRUE}
+str(nypd_c)
+```
+
+The summary statistics of the new data frame is gathered once again.
+
+```{r summary_new, echo=TRUE}
+summary(nypd_c)
+```
+
+From the summary, we discover that the JURISDICTION_CODE, LOCATION_DESC, PERP_AGE_GROUP, PERP_SEX, PERP_RACE all contain missing values or NAs. When we examine those variables, we will remove the missing data for our analysis. Similarly, "unknown" values are recorded in the PERP_AGE_GROUP, VIC_AGE_GROUP, VIC_SEX, and VIC_RACE column variables. 
+
+First, we want to visualize the frequency distribution of shooting incidents by borough with a bar chart.
+
+```{r freq_boro, echo=TRUE,fig.width=8}
+freq_boro <- table(nypd_c$BORO)
+barplot(freq_boro, xlab = "Borough", ylab = "Frequency", main = "Shooting Incidents by Borough in New York City", ylim = c(0,10000))
+```
+
+The bar chart shows that out of all the boroughs recorded in New York City, Brooklyn has the highest frequency of shooting incidents, followed by Bronx, Queens, Manhattan, and Staten Island. This may suggest that Brooklyn is less safe compared to other boroughs in New York City. 
+
+Next, we want to examine the demographic information for both the perpetrators and victims. We will subset the data set further by looking at the relevant columns pertaining to both parties and removing cases with missing values. 
+
+```{r dataframe_narm, echo=TRUE}
+nypd_demog <- nypd_c%>%
+  select(PERP_AGE_GROUP:VIC_RACE)
+nypd_narm <- na.omit(nypd_demog)
+```
+
+The summary function is run on the new dataframe to ensure that all missing datas are removed before analysis. 
+
+```{r summary_narm, echo=TRUE}
+summary(nypd_narm)
+```
+
+Now that the missing values are removed, we can proceed with obtaining the demographic information for the perpetrators as well as victims starting with age. 
+
+```{r compare_age, echo=TRUE,fig.width=7}
+p_age <- table(nypd_narm$PERP_AGE_GROUP)
+p_age
+barplot(p_age, xlab = "Age Group", ylab = "Frequency", main = "Age Group Frequency Distribution of Perpetrators in Shooting Incidents", ylim = c(0,6000))
+v_age <- table(nypd_narm$VIC_AGE_GROUP)
+v_age
+barplot(v_age, xlab = "Age Group", ylab = "Frequency", main = "Age Group Frequency Distribution of Victims in Shooting Incidents", ylim = c(0,7000))
+```
+
+For perpetrators in the shooting incidents, there are almost 5500 that belong in the 18-24 age group. On the other hand, the majority of victims are from the 25-44 age group. There is a drop in counts in the lower end (below 18) and higher end (65+) of the age groups for both parties. More analysis is needed to determine the cause in the disproportion. There are also 3 outliers in the variable coding the perpetrators' age. Since they are beyond the normal lifespan, it is likely these are typos in data entry. 
+
+Next, we will compare the frequency distribution of gender for both the suspects and victims. 
+
+```{r compare_gender,echo=TRUE, fig.width=8}
+p_sex <- table(nypd_narm$PERP_SEX)
+p_sex
+barplot(p_sex,xlab = "Gender", ylab = "Frequency", main = "Frequency Distribution of Suspects' Gender in Shooting Incidents")
+v_sex <- table(nypd_narm$VIC_SEX)
+v_sex
+barplot(v_sex,xlab = "Gender", ylab = "Frequency", main = "Frequency Distribution of Victims' Gender in Shooting Incidents", ylim = c(0,14000))
+```
+
+For both suspects and victims, more than half are male. This seems to suggest that males are more likely to be involved in shooting incidents in New York City. 
+
+The last category of demographic information we want to explore from the data set is race for both parties.
+```{r compare_race,echo=TRUE,fig.width=8}
+p_race <- table(nypd_narm$PERP_RACE)
+p_race
+par(mar = c(4,16,4,2))
+barplot(p_race,xlab = "Frequency", main = "Frequency Distribution of Perpetrators' Race", xlim = c(0,10000),las = 2,horiz = T)
+v_race <- table(nypd_narm$VIC_RACE)
+v_race
+par(mar = c(4,16,4,2))
+barplot(v_race,xlab = "Frequency", main = "Frequency Distribution of Victims' Race", xlim = c(0,12000),las = 2,horiz = T)
+```
+
+Out of the shooting incidents that we analyzed, both victims and perpetrators tend to be blacks. It is not evident the underlying causes for the disproportion in race. 
+
+Finally, we want to determine if the occasions of murder defined by a victim's death is dependent on the borough in New York City. We can perform the chi-square test of independence to examine whether the two categorical variables are dependent. The counts are assumed to be independent representing each separate shooting incident. We will construct a contingency table to further examine our remaining condition prior to conducting the chi-square test of independence. 
+
+```{r contingency_table, echo=TRUE}
+boro_murder <- table(nypd_c$STATISTICAL_MURDER_FLAG, nypd_c$BORO)
+boro_murder
+```
+
+Since the expected frequencies for each cell is greater than 5, all conditions are satisfied for us to conduct a chi-square test with an alpha level of 0.05.
+
+```{r chisquare, echo=TRUE}
+chisq.test(boro_murder)
+```
+
+With 4 degrees of freedom, the test statistic for the chi-square test of independence is 8.5598 with a p-value of 0.0731. Since the p-value is greater than our alpha level, we fail to reject our null hypothesis. Therefore, the two variables are independent. 
+
+
+We conclude that Brooklyn is the most dangerous borough in New York City with the highest frequency of shooting incidents. It is likely that the suspects and victims are similar in age who belong to the 18-24 as well as 25-44 age groups. Black males are the predominant group that are involved in these shooting incidents. However, the location as categorized by boroughs are independent from the instances of shooting incidents resulting in murder.
+
+Possible sources of bias may stem from the fact that the analyst is not from the United States. It is hard for the analyst to determine external factors such as cultural, political, sociological that can explain the frequency distribution of the shooting incidents. Even though black males are identified to be most likely to be linked to shooting incidents in New York City, population density data is not examined in this report and can be further explored to further ascertain the relationships between the variables.
+
+
+Please find below the session info for this document:
+
+```{r sessioninfo, echo=TRUE}
+sessionInfo()
+```
